@@ -23,6 +23,16 @@ namespace MoveMouse
         [DllImport("user32.dll")]
         private static extern IntPtr FindWindow(String sClassname, String sAppname);
 
+        internal class NativeMethods
+        {
+            // Import SetThreadExecutionState Win32 API and necessary flags
+            [DllImport("kernel32.dll")]
+            public static extern uint SetThreadExecutionState(uint esFlags);
+            public const uint ES_CONTINUOUS = 0x80000000;
+            public const uint ES_SYSTEM_REQUIRED = 0x00000001;
+        }
+
+       
 
         public enum fsModifiers
         {
@@ -31,8 +41,9 @@ namespace MoveMouse
             Shift = 0x0004,
             Window = 0x0008
         }
-        private IntPtr thisWindow;
 
+        private IntPtr thisWindow;
+        private uint fPreviousExecutionState;
 
         private void KeepUnlocked_Load(object sender, EventArgs e)
         {
@@ -44,6 +55,16 @@ namespace MoveMouse
         public KeepUnlocked()
         {
             InitializeComponent();
+
+            // Set new state to prevent system sleep
+            fPreviousExecutionState = NativeMethods.SetThreadExecutionState(
+                NativeMethods.ES_CONTINUOUS | NativeMethods.ES_SYSTEM_REQUIRED);
+            if (fPreviousExecutionState == 0)
+            {
+                MessageBox.Show("Failed");
+                Console.WriteLine("SetThreadExecutionState failed. Do something here...");
+                Close();
+            }
 
         }
 
@@ -95,6 +116,15 @@ namespace MoveMouse
         {
             Timer.Stop();
             this.Visible = true;
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            base.OnClosed(e);
+            if (NativeMethods.SetThreadExecutionState(fPreviousExecutionState) == 0)
+            {
+                MessageBox.Show("Failed to restore state");
+            }
         }
     }
 }
